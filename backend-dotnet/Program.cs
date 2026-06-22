@@ -32,8 +32,6 @@ app.UseCors("AllowFrontend");
 
 app.MapHub<EchoHub>("/echo");
 Console.WriteLine("🔌 SignalR EchoHub listening on /echo");
-app.MapHub<MorseHub>("/morse");
-Console.WriteLine("📡 MorseHub listening on /morse");
 
 // για να κάνουμε server τα static pages που έχω στο wlroots
 app.UseStaticFiles();
