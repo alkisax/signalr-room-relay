@@ -14,7 +14,7 @@ builder.Services.AddCors(options =>
     policy
       .WithOrigins(
         "http://localhost:8081",
-        "https://morse-dotnet.portfolio-projects.space"
+        "https://morse-dotnet.portfolio-projects.space" //TODO change after deploy
       )
       .AllowAnyHeader()
       .AllowAnyMethod()

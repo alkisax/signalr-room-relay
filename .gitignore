@@ -176,3 +176,10 @@ secrets.json
 # OS files
 .DS_Store
 Thumbs.db
+
+# Android signing / local files
+*.keystore
+*.jks
+*.p12
+*.pem
+local.properties
