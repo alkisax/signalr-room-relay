@@ -68,7 +68,7 @@ curl https://signalr-room-relay.portfolio-projects.space/health
 ssh root@49.12.76.128
 
 ```bash
-cd /var/www/signalr-room-relay && git pull origin main && cd backend-dotnet && rm -rf out-new && dotnet publish -c Release -o out-new && pm2 stop signalr-room-relay && rm -rf out && mv out-new out && cd out && pm2 restart signalr-room-relay && curl https://signalr-room-relay.portfolio-projects.space/health
+cd /var/www/signalr-room-relay && git pull origin main && cd backend-dotnet && rm -rf out-new && dotnet publish -c Release -o out-new && pm2 stop signalr-room-relay && rm -rf out && mv out-new out && cd out && pm2 restart signalr-room-relay && sleep 3 && curl https://signalr-room-relay.portfolio-projects.space/health
 
 ```
 pm2 logs signalr-room-relay --lines 50
