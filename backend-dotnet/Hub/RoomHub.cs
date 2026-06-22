@@ -1,19 +1,19 @@
-// backend-dotnet\Hub\EchoHub.cs
+// backend-dotnet\Hub\RoomHub.cs
 using System;
 using Microsoft.AspNetCore.SignalR;
 
 namespace backend_dotnet;
 
-public class EchoHub : Hub
+public class RoomHub : Hub
 {
   private static readonly Dictionary<string, HashSet<string>> Rooms = new();
   private static readonly Dictionary<string, string> ConnectionRooms = new();
   public override async Task OnConnectedAsync()
   {
     //  με override αλλάζω default behavior του Hub lifecycle
-    Console.WriteLine($"🔌 connected: {Context.ConnectionId}"); 
+    Console.WriteLine($"🔌 connected: {Context.ConnectionId}");
     // τρέξε και το normal internal SignalR behavior
-    await base.OnConnectedAsync();   
+    await base.OnConnectedAsync();
   }
 
   //Αυτό το βήμα είναι σημαντικό γιατί: disconnect δεν είναι "method που καλεί ο client" είναι lifecycle event του hub.
@@ -119,6 +119,56 @@ public class EchoHub : Hub
   {
     Console.WriteLine($"room {roomId}: {message}");
     await Clients.OthersInGroup(roomId).SendAsync("ReceiveRoomMessage", message);
+  }
+
+  /// <summary>
+  /// Leave realtime room/group explicitly
+  /// </summary>
+  /// <param name="roomId">string</param>
+  public async Task LeaveRoom(string roomId)
+  {
+    if (string.IsNullOrWhiteSpace(roomId))
+    {
+      return;
+    }
+
+    if (
+      !ConnectionRooms.TryGetValue(
+        Context.ConnectionId,
+        out string? currentRoomId
+      )
+    )
+    {
+      return;
+    }
+
+    if (currentRoomId != roomId)
+    {
+      return;
+    }
+
+    await Groups.RemoveFromGroupAsync(
+      Context.ConnectionId,
+      roomId
+    );
+
+    if (Rooms.ContainsKey(roomId))
+    {
+      Rooms[roomId].Remove(Context.ConnectionId);
+      int count = Rooms[roomId].Count;
+      Console.WriteLine($"🚪 {Context.ConnectionId} left room {roomId}. Users: {count}");
+      ConnectionRooms.Remove(Context.ConnectionId);
+
+      await Clients.Group(roomId).SendAsync(
+        "RoomUsers",
+        count
+      );
+
+      if (count == 0)
+      {
+        Rooms.Remove(roomId);
+      }
+    }
   }
 
 }

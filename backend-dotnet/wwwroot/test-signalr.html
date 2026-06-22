@@ -1,37 +1,124 @@
-<!-- backend-dotnet\wwwroot\test-signalr.html -->
+<!-- backend-dotnet/wwwroot/test-signalr.html -->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>SignalR Echo + Rooms Test</title>
+    <title>SignalR Room Relay Test</title>
+
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
 
     <style>
-      body { font-family: Arial, sans-serif; padding: 20px; }
-      input, button { padding: 8px; margin: 4px; }
-      #messages { margin-top: 20px; border: 1px solid #ccc; padding: 12px; min-height: 220px; }
-      .message { background: #f1f1f1; padding: 8px; margin-bottom: 8px; }
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+
+      input,
+      button {
+        padding: 8px;
+        margin: 4px;
+      }
+
+      input {
+        min-width: 280px;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .row {
+        margin-bottom: 10px;
+      }
+
+      .status {
+        margin-left: 8px;
+        font-weight: bold;
+      }
+
+      #messages {
+        margin-top: 20px;
+        border: 1px solid #ccc;
+        padding: 12px;
+        min-height: 300px;
+      }
+
+      .message {
+        background: #f1f1f1;
+        padding: 8px;
+        margin-bottom: 8px;
+        white-space: pre-wrap;
+      }
     </style>
   </head>
 
   <body>
-    <h1>SignalR Echo + Rooms Test</h1>
+    <h1>SignalR Room Relay Test</h1>
 
-    <div>
-      <button id="connectBtn">Connect</button>
-      <button id="disconnectBtn">Disconnect</button>
+    <div class="row">
+      <button id="connectBtn" type="button">Connect</button>
+      <button id="disconnectBtn" type="button">Disconnect</button>
+
+      <span class="status">
+        Status:
+        <strong id="statusText">Disconnected</strong>
+      </span>
     </div>
 
-    <div>
-      <input id="roomInput" value="abc" />
-      <button id="joinRoomBtn">Join Room</button>
-      <span>Room users: <strong id="roomUsers">0</strong></span>
+    <div class="row">
+      <input
+        id="roomInput"
+        value="penAndPaper-blackHole-123"
+      />
+
+      <button id="joinRoomBtn" type="button">
+        Join Room
+      </button>
+
+      <button id="leaveRoomBtn" type="button">
+        Leave Room
+      </button>
+
+      <span class="status">
+        Current room:
+        <strong id="currentRoomText">none</strong>
+      </span>
+
+      <span class="status">
+        Room users:
+        <strong id="roomUsers">0</strong>
+      </span>
     </div>
 
-    <div>
-      <button id="echoBtn">Echo To Self</button>
-      <button id="announceBtn">Announce To Others</button>
-      <button id="sendRoomBtn">Send To Room</button>
+    <hr />
+
+    <div class="row">
+      <input
+        id="chatInput"
+        value="hello room"
+      />
+
+      <button id="sendChatBtn" type="button">
+        Send Chat Message
+      </button>
+    </div>
+
+    <div class="row">
+      <input
+        id="cellInput"
+        value="12"
+        type="number"
+      />
+
+      <button id="sendMoveBtn" type="button">
+        Send Black Hole Move
+      </button>
+    </div>
+
+    <div class="row">
+      <button id="echoBtn" type="button">
+        Echo To Self
+      </button>
     </div>
 
     <div id="messages"></div>
@@ -39,113 +126,308 @@
     <script>
       const messagesDiv = document.getElementById('messages');
       const roomUsersSpan = document.getElementById('roomUsers');
+      const statusText = document.getElementById('statusText');
+      const currentRoomText = document.getElementById('currentRoomText');
+
+      let currentRoomId = '';
 
       const addMessage = (text) => {
         const div = document.createElement('div');
+
         div.className = 'message';
         div.textContent = text;
+
         messagesDiv.prepend(div);
       };
 
+      const setStatus = (text) => {
+        statusText.textContent = text;
+      };
+
+      const setCurrentRoom = (roomId) => {
+        currentRoomId = roomId;
+        currentRoomText.textContent = roomId || 'none';
+      };
+
+      const getRoomId = () => {
+        return document
+          .getElementById('roomInput')
+          .value
+          .trim();
+      };
+
       const connection = new signalR.HubConnectionBuilder()
-        .withUrl('/echo')
+        .withUrl('/room')
         .withAutomaticReconnect()
         .build();
+
+      const isConnected = () => {
+        return connection.state === signalR.HubConnectionState.Connected;
+      };
+
+      const requireConnected = () => {
+        if (!isConnected()) {
+          addMessage('⚠️ connect first');
+          return false;
+        }
+
+        return true;
+      };
 
       connection.on('ReceiveMessage', (message) => {
         addMessage(`📥 self echo: ${message}`);
       });
 
-      connection.on('ReceiveAnnouncement', (message) => {
-        addMessage(`📢 announcement: ${message}`);
-      });
-
       connection.on('ReceiveRoomMessage', (message) => {
-        addMessage(`🏠 room message: ${message}`);
+        try {
+          const event = JSON.parse(message);
+
+          addMessage(
+            `📥 room event:\n${JSON.stringify(event, null, 2)}`
+          );
+        } catch {
+          addMessage(`📥 raw room message: ${message}`);
+        }
       });
 
       connection.on('RoomUsers', (count) => {
-        roomUsersSpan.textContent = count;
+        roomUsersSpan.textContent = String(count);
         addMessage(`👥 room users: ${count}`);
       });
 
       connection.onreconnecting(() => {
+        setStatus('Reconnecting');
         addMessage('🟡 reconnecting...');
       });
 
-      connection.onreconnected(() => {
+      connection.onreconnected(async () => {
+        setStatus('Connected');
         addMessage('🟢 reconnected');
+
+        if (currentRoomId) {
+          try {
+            await connection.invoke('JoinRoom', currentRoomId);
+            addMessage(`🫂 rejoined room: ${currentRoomId}`);
+          } catch (err) {
+            addMessage(`❌ rejoin error: ${err.message}`);
+          }
+        }
       });
 
       connection.onclose(() => {
+        setStatus('Disconnected');
         roomUsersSpan.textContent = '0';
         addMessage('🔴 disconnected');
       });
 
-      document.getElementById('connectBtn').addEventListener('click', async () => {
+      const connect = async () => {
+        if (isConnected()) {
+          addMessage('⚠️ already connected');
+          return;
+        }
+
         try {
           await connection.start();
-          addMessage('🟢 connected');
+
+          setStatus('Connected');
+          addMessage(`🟢 connected: ${connection.connectionId}`);
         } catch (err) {
           console.log(err);
           addMessage(`❌ connect error: ${err.message}`);
         }
-      });
+      };
 
-      document.getElementById('disconnectBtn').addEventListener('click', async () => {
+      const leaveCurrentRoom = async () => {
+        if (!requireConnected()) return false;
+
+        if (!currentRoomId) {
+          addMessage('⚠️ not inside a room');
+          return false;
+        }
+
         try {
+          const roomToLeave = currentRoomId;
+
+          await connection.invoke('LeaveRoom', roomToLeave);
+
+          setCurrentRoom('');
+          roomUsersSpan.textContent = '0';
+
+          addMessage(`🚪 left room: ${roomToLeave}`);
+
+          return true;
+        } catch (err) {
+          console.log(err);
+          addMessage(`❌ leave room error: ${err.message}`);
+          return false;
+        }
+      };
+
+      const disconnect = async () => {
+        try {
+          if (isConnected() && currentRoomId) {
+            const roomToLeave = currentRoomId;
+
+            await connection.invoke('LeaveRoom', roomToLeave);
+
+            setCurrentRoom('');
+            roomUsersSpan.textContent = '0';
+
+            addMessage(`🚪 left room before disconnect: ${roomToLeave}`);
+          }
+
           await connection.stop();
         } catch (err) {
           console.log(err);
+          addMessage(`❌ disconnect error: ${err.message}`);
         }
-      });
+      };
 
-      document.getElementById('joinRoomBtn').addEventListener('click', async () => {
+      const joinRoom = async () => {
+        if (!requireConnected()) return;
+
+        const roomId = getRoomId();
+
+        if (!roomId) {
+          addMessage('⚠️ room id is empty');
+          return;
+        }
+
+        if (currentRoomId === roomId) {
+          addMessage(`⚠️ already in room: ${roomId}`);
+          return;
+        }
+
         try {
-          const roomId = document.getElementById('roomInput').value;
+          if (currentRoomId) {
+            const previousRoomId = currentRoomId;
+
+            await connection.invoke('LeaveRoom', previousRoomId);
+
+            addMessage(`🚪 left previous room: ${previousRoomId}`);
+          }
 
           await connection.invoke('JoinRoom', roomId);
+
+          setCurrentRoom(roomId);
 
           addMessage(`🫂 joined room: ${roomId}`);
         } catch (err) {
           console.log(err);
-          addMessage(`❌ join error: ${err.message}`);
+          addMessage(`❌ join room error: ${err.message}`);
         }
-      });
+      };
 
-      document.getElementById('echoBtn').addEventListener('click', async () => {
-        try {
-          await connection.invoke('Echo', 'hello self');
-          addMessage('📤 echo sent');
-        } catch (err) {
-          console.log(err);
+      const sendRoomEvent = async (event) => {
+        if (!requireConnected()) return;
+
+        if (!currentRoomId) {
+          addMessage('⚠️ join room first');
+          return;
         }
-      });
 
-      document.getElementById('announceBtn').addEventListener('click', async () => {
-        try {
-          await connection.invoke('Announce', 'hello all others');
-          addMessage('📡 announcement sent');
-        } catch (err) {
-          console.log(err);
+        const typedRoomId = getRoomId();
+
+        if (typedRoomId !== currentRoomId) {
+          addMessage(
+            `⚠️ input room is "${typedRoomId}", but current room is "${currentRoomId}". Press Join Room first.`
+          );
+          return;
         }
-      });
 
-      document.getElementById('sendRoomBtn').addEventListener('click', async () => {
         try {
-          const roomId = document.getElementById('roomInput').value;
+          const message = JSON.stringify(event);
 
           await connection.invoke(
             'SendToRoom',
-            roomId,
-            'hello room'
+            currentRoomId,
+            message,
           );
 
-          addMessage(`📨 sent to room: ${roomId}`);
+          addMessage(
+            `📤 sent to room ${currentRoomId}:\n${JSON.stringify(event, null, 2)}`
+          );
         } catch (err) {
           console.log(err);
+          addMessage(`❌ send room event error: ${err.message}`);
+        }
+      };
+
+      const sendChatMessage = async () => {
+        const text = document
+          .getElementById('chatInput')
+          .value;
+
+        await sendRoomEvent({
+          type: 'CHAT_MESSAGE',
+          payload: {
+            text,
+          },
+        });
+      };
+
+      const sendBlackHoleMove = async () => {
+        const cellId = Number(
+          document.getElementById('cellInput').value
+        );
+
+        await sendRoomEvent({
+          type: 'BLACK_HOLE_MOVE',
+          payload: {
+            cellId,
+          },
+        });
+      };
+
+      const echoToSelf = async () => {
+        if (!requireConnected()) return;
+
+        try {
+          await connection.invoke(
+            'Echo',
+            'hello self',
+          );
+
+          addMessage('📤 echo sent');
+        } catch (err) {
+          console.log(err);
+          addMessage(`❌ echo error: ${err.message}`);
+        }
+      };
+
+      window.addEventListener('beforeunload', () => {
+        if (isConnected()) {
+          connection.stop();
         }
       });
+
+      document
+        .getElementById('connectBtn')
+        .addEventListener('click', connect);
+
+      document
+        .getElementById('disconnectBtn')
+        .addEventListener('click', disconnect);
+
+      document
+        .getElementById('joinRoomBtn')
+        .addEventListener('click', joinRoom);
+
+      document
+        .getElementById('leaveRoomBtn')
+        .addEventListener('click', leaveCurrentRoom);
+
+      document
+        .getElementById('sendChatBtn')
+        .addEventListener('click', sendChatMessage);
+
+      document
+        .getElementById('sendMoveBtn')
+        .addEventListener('click', sendBlackHoleMove);
+
+      document
+        .getElementById('echoBtn')
+        .addEventListener('click', echoToSelf);
     </script>
   </body>
 </html>

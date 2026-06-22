@@ -30,8 +30,8 @@ var app = builder.Build();
 
 app.UseCors("AllowFrontend");
 
-app.MapHub<EchoHub>("/echo");
-Console.WriteLine("🔌 SignalR EchoHub listening on /echo");
+app.MapHub<RoomHub>("/room");
+Console.WriteLine("🔌 SignalR RoomHub listening on /room");
 
 // για να κάνουμε server τα static pages που έχω στο wlroots
 app.UseStaticFiles();
