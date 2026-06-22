@@ -1,0 +1,9 @@
+@baseUrl = http://localhost:3016
+
+###
+POST {{baseUrl}}/api/log-from-front
+Content-Type: application/json
+
+{
+  "data": "hello from frontend"
+}

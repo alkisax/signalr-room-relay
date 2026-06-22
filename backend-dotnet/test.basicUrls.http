@@ -1,0 +1,25 @@
+@baseUrl = http://localhost:3016
+
+GET {{baseUrl}}/
+###
+
+GET {{baseUrl}}/api/ping
+###
+
+GET {{baseUrl}}/health
+###
+
+GET {{baseUrl}}/privacy
+###
+
+GET {{baseUrl}}/delete-account
+###
+
+GET {{baseUrl}}/privacy.html
+###
+
+GET {{baseUrl}}/delete-account.html
+###
+
+GET {{baseUrl}}/app-ads.txt
+###

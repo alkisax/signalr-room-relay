@@ -1,0 +1,151 @@
+<!-- backend-dotnet\wwwroot\test-signalr.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SignalR Echo + Rooms Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
+
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; }
+      input, button { padding: 8px; margin: 4px; }
+      #messages { margin-top: 20px; border: 1px solid #ccc; padding: 12px; min-height: 220px; }
+      .message { background: #f1f1f1; padding: 8px; margin-bottom: 8px; }
+    </style>
+  </head>
+
+  <body>
+    <h1>SignalR Echo + Rooms Test</h1>
+
+    <div>
+      <button id="connectBtn">Connect</button>
+      <button id="disconnectBtn">Disconnect</button>
+    </div>
+
+    <div>
+      <input id="roomInput" value="abc" />
+      <button id="joinRoomBtn">Join Room</button>
+      <span>Room users: <strong id="roomUsers">0</strong></span>
+    </div>
+
+    <div>
+      <button id="echoBtn">Echo To Self</button>
+      <button id="announceBtn">Announce To Others</button>
+      <button id="sendRoomBtn">Send To Room</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script>
+      const messagesDiv = document.getElementById('messages');
+      const roomUsersSpan = document.getElementById('roomUsers');
+
+      const addMessage = (text) => {
+        const div = document.createElement('div');
+        div.className = 'message';
+        div.textContent = text;
+        messagesDiv.prepend(div);
+      };
+
+      const connection = new signalR.HubConnectionBuilder()
+        .withUrl('/echo')
+        .withAutomaticReconnect()
+        .build();
+
+      connection.on('ReceiveMessage', (message) => {
+        addMessage(`📥 self echo: ${message}`);
+      });
+
+      connection.on('ReceiveAnnouncement', (message) => {
+        addMessage(`📢 announcement: ${message}`);
+      });
+
+      connection.on('ReceiveRoomMessage', (message) => {
+        addMessage(`🏠 room message: ${message}`);
+      });
+
+      connection.on('RoomUsers', (count) => {
+        roomUsersSpan.textContent = count;
+        addMessage(`👥 room users: ${count}`);
+      });
+
+      connection.onreconnecting(() => {
+        addMessage('🟡 reconnecting...');
+      });
+
+      connection.onreconnected(() => {
+        addMessage('🟢 reconnected');
+      });
+
+      connection.onclose(() => {
+        roomUsersSpan.textContent = '0';
+        addMessage('🔴 disconnected');
+      });
+
+      document.getElementById('connectBtn').addEventListener('click', async () => {
+        try {
+          await connection.start();
+          addMessage('🟢 connected');
+        } catch (err) {
+          console.log(err);
+          addMessage(`❌ connect error: ${err.message}`);
+        }
+      });
+
+      document.getElementById('disconnectBtn').addEventListener('click', async () => {
+        try {
+          await connection.stop();
+        } catch (err) {
+          console.log(err);
+        }
+      });
+
+      document.getElementById('joinRoomBtn').addEventListener('click', async () => {
+        try {
+          const roomId = document.getElementById('roomInput').value;
+
+          await connection.invoke('JoinRoom', roomId);
+
+          addMessage(`🫂 joined room: ${roomId}`);
+        } catch (err) {
+          console.log(err);
+          addMessage(`❌ join error: ${err.message}`);
+        }
+      });
+
+      document.getElementById('echoBtn').addEventListener('click', async () => {
+        try {
+          await connection.invoke('Echo', 'hello self');
+          addMessage('📤 echo sent');
+        } catch (err) {
+          console.log(err);
+        }
+      });
+
+      document.getElementById('announceBtn').addEventListener('click', async () => {
+        try {
+          await connection.invoke('Announce', 'hello all others');
+          addMessage('📡 announcement sent');
+        } catch (err) {
+          console.log(err);
+        }
+      });
+
+      document.getElementById('sendRoomBtn').addEventListener('click', async () => {
+        try {
+          const roomId = document.getElementById('roomInput').value;
+
+          await connection.invoke(
+            'SendToRoom',
+            roomId,
+            'hello room'
+          );
+
+          addMessage(`📨 sent to room: ${roomId}`);
+        } catch (err) {
+          console.log(err);
+        }
+      });
+    </script>
+  </body>
+</html>
